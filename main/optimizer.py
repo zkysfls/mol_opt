@@ -342,11 +342,15 @@ class BaseOptimizer:
 
 
     def production(self, oracle, config, num_runs=5, project="production"):
+        """
         seeds = [0, 1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97]
         # seeds = [23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97]
         if num_runs > len(seeds):
             raise ValueError(f"Current implementation only allows at most {len(seeds)} runs.")
         seeds = seeds[:num_runs]
+        """
+        random.seed(42)  # Use a fixed seed for reproducibility
+        seeds = random.sample(range(1000), num_runs)  # Generate num_runs unique random seeds
         for seed in seeds:
             self.optimize(oracle, config, seed, project)
             self.reset()

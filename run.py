@@ -8,10 +8,10 @@ sys.path.append(os.path.realpath(__file__))
 from tdc import Oracle
 from time import time 
 
-def main(method,oracle_name):
+def main():
     start_time = time() 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--method', default=method)#'reinvent')
+    parser.add_argument('--method', default='reinvent')
     parser.add_argument('--smi_file', default=None)
     parser.add_argument('--config_default', default='hparams_default.yaml')
     parser.add_argument('--config_tune', default='hparams_tune.yaml')
@@ -25,11 +25,13 @@ def main(method,oracle_name):
     # parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--seed', type=int, nargs="+", default=[0])
     parser.add_argument('--task', type=str, default="simple", choices=["tune", "simple", "production"])
-    oracle_list=["ASKCOS","IBM_RXN","GSK3B","JNK3","DRD2","SA","QED","LogP","Rediscovery","Celecoxib_Rediscovery","Rediscovery_Meta"]
-    parser.add_argument('--oracles', nargs="+", default=[oracle_name]) ### default=["QED"]#JNK3   memory large
+    # oracle_list=["ASKCOS","IBM_RXN","GSK3B","JNK3","DRD2","SA","QED","LogP","Rediscovery","Celecoxib_Rediscovery","Rediscovery_Meta"]
+    parser.add_argument('--oracles', nargs="+", default=["QED"]) ### default=["QED"]#JNK3   memory large
     parser.add_argument('--log_results', action='store_true')
     parser.add_argument('--log_code', action='store_true')
     parser.add_argument('--wandb', type=str, default="offline", choices=["online", "offline", "disabled"])
+    parser.add_argument('--custom_docking', type=str, default=None)
+    parser.add_argument('--custom_docking_config', type=str, default=None)
     args = parser.parse_args()
 
     os.environ["WANDB_MODE"] = args.wandb
@@ -131,29 +133,52 @@ def main(method,oracle_name):
     if args.pickle_directory is None:
         args.pickle_directory = path_main
 
+
+    try:
+        config_default = yaml.safe_load(open(args.config_default))
+    except:
+        config_default = yaml.safe_load(open(os.path.join(path_main, args.config_default)))
+
+    try:
+        config_tune = yaml.safe_load(open(args.config_tune))
+    except:
+        config_tune = yaml.safe_load(open(os.path.join(path_main, args.config_tune)))
+
+
     if args.task != "tune":
-    
-        for oracle_name in args.oracles:
-
-            print(f'Optimizing oracle function: {oracle_name}')
-
-            try:
-                config_default = yaml.safe_load(open(args.config_default))
-            except:
-                config_default = yaml.safe_load(open(os.path.join(path_main, args.config_default)))
-
-            oracle = Oracle(name = oracle_name)
+        if args.custom_docking_config:
+            with open(args.custom_docking_config, 'r') as f:
+                docking_config = {line.split('=')[0].strip(): line.split('=')[1].strip() for line in f if '=' in line}
+            oracle = Oracle(
+                name='pyscreener',
+                receptor_pdb_file=args.custom_docking,
+                box_center=(float(docking_config['center_x']), float(docking_config['center_y']), float(docking_config['center_z'])),
+                box_size=(float(docking_config['size_x']), float(docking_config['size_y']), float(docking_config['size_z'])),
+                exhaustiveness=int(docking_config['exhaustiveness']),
+                num_modes=int(docking_config['num_modes']),
+                energy_range=float(docking_config['energy_range'])
+            )
             optimizer = Optimizer(args=args)
-
+            # optimizer.optimize(oracle=oracle, config=config_default)
             if args.task == "simple":
-                # optimizer.optimize(oracle=oracle, config=config_default, seed=args.seed) 
-                for seed in args.seed:
-                    print('seed', seed)
-                    optimizer.optimize(oracle=oracle, config=config_default, seed=seed)
+                optimizer.optimize(oracle=oracle, config=config_default)
+            elif args.task == "tune":
+                optimizer.hparam_tune(oracle=oracle, hparam_space=config_tune, hparam_default=config_default, count=args.n_runs)
             elif args.task == "production":
                 optimizer.production(oracle=oracle, config=config_default, num_runs=args.n_runs)
-            else:
-                raise ValueError('Unrecognized task name, task should be in one of simple, tune and production.')
+        else:
+            for oracle_name in args.oracles:
+                print(f'Optimizing oracle function: {oracle_name}')
+                oracle = Oracle(name=oracle_name)
+                optimizer = Optimizer(args=args)
+                if args.task == "simple":
+                    for seed in args.seed:
+                        print('seed', seed)
+                        optimizer.optimize(oracle=oracle, config=config_default, seed=seed)
+                elif args.task == "production":
+                    optimizer.production(oracle=oracle, config=config_default, num_runs=args.n_runs)
+                else:
+                    raise ValueError('Unrecognized task name, task should be in one of simple, tune and production.')
 
     elif args.task == "tune":
 
@@ -183,14 +208,15 @@ def main(method,oracle_name):
 
 
 if __name__ == "__main__":
-    for oracle_name in ["Albuterol_Similarity", "Amlodipine_MPO", 
+
+
+    oracle_names = ["Albuterol_Similarity", "Amlodipine_MPO", 
                         "Celecoxib_Rediscovery", "Deco_Hop", "DRD2", 
                         "Fexofenadine_MPO", "GSK3B", "Isomers_C7H8N2O2",
                         "Isomers_C7H8N2O3", "Isomers_C9H10N2O2PF2Cl", "JNK3",
                         "Median 1", "Median 2", "Mestranol_Similarity", 
                         "Osimertinib_MPO", "Perindopril_MPO", "QED", "Ranolazine_MPO",
                         "Scaffold_Hop", "Sitagliptin_MPO", "Thiothixene_Rediscovery", 
-                        "Troglitazone_Rediscovery", "Valsartan_Smarts", "Zaleplon_MPO"]: #["Zaleplon_MPO","Amlodipine_MPO","GSK3B"]:#["Thiothixene_Rediscovery","Troglitazone_Rediscovery","Valsartan_Smarts","Zaleplon_MPO","Amlodipine_MPO","GSK3B"]:
-        for method in ["reinvent_transformer","reinvent"]:
-            main(method,oracle_name)
+                        "Troglitazone_Rediscovery", "Valsartan_Smarts", "Zaleplon_MPO"]
 
+    main()

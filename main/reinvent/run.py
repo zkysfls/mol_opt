@@ -33,9 +33,11 @@ class REINVENT_Optimizer(BaseOptimizer):
         # Saved models are partially on the GPU, but if we dont have cuda enabled we can remap these
         # to the CPU.
         if torch.cuda.is_available():
+            print("continue using cuda")
             Prior.rnn.load_state_dict(torch.load(os.path.join(path_here,'data/Prior.ckpt')))
             Agent.rnn.load_state_dict(torch.load(restore_agent_from))
         else:
+            print("continue using cpu")
             Prior.rnn.load_state_dict(torch.load(os.path.join(path_here, 'data/Prior.ckpt'), map_location=lambda storage, loc: storage))
             Agent.rnn.load_state_dict(torch.load(restore_agent_from, map_location=lambda storage, loc: storage))
 

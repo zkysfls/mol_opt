@@ -39,7 +39,12 @@ class JTVAE_BO_Optimizer(BaseOptimizer):
         depthG = int(config['depthG'])
         model = JTNNVAE(vocab, hidden_size, latent_size, depthT, depthG)
         model.load_state_dict(torch.load(config['model_path']))
-        vae_model = model.cuda()
+        if torch.cuda.is_available():
+            vae_model = model.cuda()
+            print("generating on cuda!")
+        else:
+            vae_model = model
+            print("generating on cpu!")
         print('Finish loading!')
 
         ## 0.1 training data 

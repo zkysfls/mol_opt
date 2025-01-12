@@ -133,3 +133,5 @@ class REINVENT_Optimizer(BaseOptimizer):
 
             step += 1
 
+
+# 700, 900, 700, 700, 800, 800, 800, 900, 1000, 900
